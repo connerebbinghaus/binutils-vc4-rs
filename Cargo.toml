@@ -2,11 +2,11 @@
 name = "binutils"
 version = "0.1.0"
 build = "build.rs"
-authors = ["Guillaume Valadon <guillaume@valadon.net>"]
+authors = ["Guillaume Valadon <guillaume@valadon.net>", "Conner Ebbinghaus <connerebbinghaus@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/guedou/binutils-rs/"
-description = "A Rust library that ease interacting with the binutils disassembly engine"
+repository = "https://github.com/connerebbinghaus/binutils-vc4-rs/"
+description = "A Rust library that ease interacting with the binutils disassembly engine (VideoCore 4 edition)"
 keywords = ["ffi", "binutils", "disassemble", "reverse"]
 categories = ["api-bindings", "external-ffi-bindings"]
 exclude = ["resources/*"]

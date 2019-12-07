@@ -118,7 +118,7 @@ fn main() {
     let current_dir = env::current_dir().unwrap();
 
     // Where binutils will be built
-    let out_directory = format!("{}/target", current_dir.to_str().unwrap());
+    let out_directory = std::env::var("OUT_DIR").unwrap();
 
     // Build binutils
     build_binutils(version, sha256, &out_directory, targets);
