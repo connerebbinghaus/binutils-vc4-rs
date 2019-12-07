@@ -10,9 +10,6 @@ use std::process;
 
 extern crate cc;
 
-extern crate sha2;
-use sha2::{Digest, Sha256};
-
 fn execute_command(command: &str, arguments: Vec<&str>) {
     // Execute a command, and panic on any error
 
@@ -47,75 +44,30 @@ fn change_dir(directory: &str) {
     }
 }
 
-fn hash_file(filename: &str, hash_value: &str) -> bool {
-    // Compute a SHA256 and return true if correct
-    let mut f = File::open(filename).expect("file not found");
-    let mut hasher = Sha256::new();
-
-    loop {
-        let mut buffer = [0; 256];
-
-        let len = match f.read(&mut buffer[..]) {
-            Err(_) => return false,
-            Ok(len) => len,
-        };
-        if len == 0 {
-            break;
-        }
-
-        hasher.input(&buffer[0..len]);
-    }
-
-    return format!("{:x}", hasher.result()) == hash_value;
+fn git_checkout_commit(repo: &git2::Repository, commit: &str) {
+    let c = repo.find_commit(git2::Oid::from_str(commit).unwrap()).unwrap();
+    repo.set_head_detached(c.id()).unwrap();
+    repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force())).unwrap();
 }
 
 fn build_binutils(version: &str, sha256sum: &str, output_directory: &str, targets: &str) {
     // Build binutils from source
 
-    let binutils_name = format!("binutils-{}", version);
-    let filename = format!("{}.tar.gz", binutils_name);
-    let directory_filename = format!("{}/{}", output_directory, filename);
+    let binutils_name = format!("binutils");
 
     // Check if binutils is already built
     if path::Path::new(&format!("{}/built/", output_directory)).exists() {
         return;
     }
 
-    // Check if the tarball exists, or download it
-    if !path::Path::new(&filename).exists() {
-        execute_command(
-            "curl",
-            vec![
-                format!("https://ftp.gnu.org/gnu/binutils/{}", filename).as_str(),
-                "--output",
-                &directory_filename,
-            ],
-        );
-    }
-
-    // Verify the SHA256 hash
-    if !hash_file(&directory_filename, sha256sum) {
-        panic!(
-            "\n\n  \
-             Incorrect hash value for {} !\n\n",
-            filename
-        );
-    }
-
-    // Check if the tarball exists after calling curl
-    if !path::Path::new(&directory_filename).exists() {
-        panic!(
-            "\n\n  \
-             Can't download {} to {} using curl!\n\n",
-            filename, directory_filename
-        );
-    }
-
-    // Call tar
     change_dir(output_directory);
-    if !path::Path::new(&binutils_name).exists() {
-        execute_command("tar", vec!["xzf", &filename]);
-    }
+    let repo = if !path::Path::new(&binutils_name).exists() {
+        git2::Repository::clone("https://github.com/itszor/binutils-vc4.git", &binutils_name).unwrap()
+    } else {
+        git2::Repository::open(&binutils_name).unwrap()
+    };
+
+    git_checkout_commit(&repo, "708acc851880dbeda1dd18aca4fd0a95b2573b36");
 
     // Calls commands to build binutils
     if path::Path::new(&binutils_name).exists() {
@@ -123,10 +75,12 @@ fn build_binutils(version: &str, sha256sum: &str, output_directory: &str, target
         let prefix_arg = format!("--prefix={}/built/", output_directory);
         execute_command(
             "./configure",
-            vec![&prefix_arg, &format!("--enable-targets={}", targets)],
+            vec![&prefix_arg, "--target=vc4-elf", "--disable-werror"],
         );
         execute_command("make", vec!["-j8"]);
         execute_command("make", vec!["install"]);
+
+        std::fs::create_dir_all(&format!("{}/built/include/", output_directory));
 
         // Copy useful files
         execute_command(
